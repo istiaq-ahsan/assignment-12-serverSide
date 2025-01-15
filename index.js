@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const port = process.env.PORT || 5000;
 const app = express();
 require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 
 const corsOptions = {
   origin: ["http://localhost:5173", "http://localhost:5174"],
@@ -49,6 +50,8 @@ async function run() {
     const db = client.db("heartMatch-db");
     const usersCollection = db.collection("users");
     const biosCollection = db.collection("allBioData");
+    const favouriteCollection = db.collection("allFavData");
+    const paymentCollection = db.collection("payments");
 
     app.post("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -104,6 +107,53 @@ async function run() {
       }
     });
 
+    //post favourite biodata
+    app.post("/favouriteBio", verifyToken, async (req, res) => {
+      const favBioData = req.body;
+      const result = await favouriteCollection.insertOne(favBioData);
+      res.send(result);
+    });
+
+    //payment
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    //save payment
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+
+      res.send({ paymentResult });
+    });
+
+    //get payment status
+    app.get("/contact-req/:email", async (req, res) => {
+      const query = { email: req.params.email };
+
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    //get favourite biodata by specific user
+    app.get("/favBioData/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { customerEmail: email };
+      const result = await favouriteCollection.find(query).toArray();
+      res.send(result);
+    });
+
     //get specific biodata
     app.get("/bioData/:email", async (req, res) => {
       const email = req.params.email;
@@ -119,7 +169,7 @@ async function run() {
     });
 
     //get specific bioData by id
-    app.get("/bioDataDetails/:id", async (req, res) => {
+    app.get("/bioDataDetails/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await biosCollection.findOne(query);
@@ -131,6 +181,22 @@ async function run() {
       const email = req.params.email;
       const query = { email };
       const result = await usersCollection.findOne(query);
+      res.send(result);
+    });
+
+    //delete favourite biodata
+    app.delete("/favOneBiodata/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await favouriteCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    //delete contact req
+    app.delete("/contact-req-dlt/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await paymentCollection.deleteOne(query);
       res.send(result);
     });
 
