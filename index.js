@@ -30,8 +30,20 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).send({ message: "unauthorized access" });
     }
     req.user = decoded;
-    next();
   });
+  next();
+};
+
+// verify admin after verifyToken
+const verifyAdmin = async (req, res, next) => {
+  const email = req.decoded.email;
+  const query = { email: email };
+  const user = await userCollection.findOne(query);
+  const isAdmin = user?.role === "admin";
+  if (!isAdmin) {
+    return res.status(403).send({ message: "forbidden access" });
+  }
+  next();
 };
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1pvay.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -73,6 +85,9 @@ async function run() {
     //post biodata
     app.patch("/all-bioData/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
+      const decodedEmail = req.user.email;
+      if (decodedEmail !== email)
+        return res.status(401).send({ message: "Unauthorized Access" });
       const query = { email };
       const bioData = req.body;
 
@@ -115,7 +130,7 @@ async function run() {
     });
 
     //payment
-    app.post("/create-payment-intent", async (req, res) => {
+    app.post("/create-payment-intent", verifyToken, async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price * 100);
       console.log(amount);
@@ -131,7 +146,7 @@ async function run() {
     });
 
     //save payment
-    app.post("/payments", async (req, res) => {
+    app.post("/payments", verifyToken, async (req, res) => {
       const payment = req.body;
       const paymentResult = await paymentCollection.insertOne(payment);
 
@@ -139,16 +154,22 @@ async function run() {
     });
 
     //get payment status
-    app.get("/contact-req/:email", async (req, res) => {
-      const query = { email: req.params.email };
-
+    app.get("/contact-req/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const decodedEmail = req.user.email;
+      if (decodedEmail !== email)
+        return res.status(401).send({ message: "Unauthorized Access" });
+      const query = { email };
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
     });
 
     //get favourite biodata by specific user
-    app.get("/favBioData/:email", async (req, res) => {
+    app.get("/favBioData/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
+      const decodedEmail = req.user.email;
+      if (decodedEmail !== email)
+        return res.status(401).send({ message: "Unauthorized Access" });
       const query = { customerEmail: email };
       const result = await favouriteCollection.find(query).toArray();
       res.send(result);
@@ -198,6 +219,28 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await paymentCollection.deleteOne(query);
       res.send(result);
+    });
+
+    //admin stat dashboard
+    app.get("/admin-stat", verifyToken, async (req, res) => {
+      const totalBioData = await biosCollection.estimatedDocumentCount();
+
+      const totalPremium = await usersCollection.countDocuments({
+        member: "premium",
+      });
+      const totalMaleBio = await biosCollection.countDocuments({
+        biodataType: "Male",
+      });
+      const totalFemaleBio = await biosCollection.countDocuments({
+        biodataType: "Female",
+      });
+
+      res.send({
+        totalBioData,
+        totalPremium,
+        totalMaleBio,
+        totalFemaleBio,
+      });
     });
 
     // Generate jwt token
