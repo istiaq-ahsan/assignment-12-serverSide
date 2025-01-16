@@ -38,7 +38,7 @@ const verifyToken = async (req, res, next) => {
 const verifyAdmin = async (req, res, next) => {
   const email = req.decoded.email;
   const query = { email: email };
-  const user = await userCollection.findOne(query);
+  const user = await usersCollection.findOne(query);
   const isAdmin = user?.role === "admin";
   if (!isAdmin) {
     return res.status(403).send({ message: "forbidden access" });
@@ -161,7 +161,38 @@ async function run() {
         return res.status(401).send({ message: "Unauthorized Access" });
       const query = { email };
       const result = await paymentCollection.find(query).toArray();
-      res.send(result);
+
+      const paymentStatus = await paymentCollection
+        .aggregate([
+          {
+            $match: { email }, //Match specific customers data only by email
+          },
+          {
+            $lookup: {
+              // go to a different collection and look for data
+              from: "users", // collection name
+              localField: "email", // local data that you want to match
+              foreignField: "email", // foreign field name of that same data
+              as: "userDetails", // return the data as plants array (array naming)
+            },
+          },
+          { $unwind: "$userDetails" }, // unwind lookup result, return without array
+          {
+            $addFields: {
+              userStatus: "$userDetails.status",
+              userName: "$userDetails.name",
+            },
+          },
+          {
+            // remove plants object property from order object
+            $project: {
+              userDetails: 0,
+            },
+          },
+        ])
+        .toArray();
+
+      res.send(paymentStatus);
     });
 
     //get favourite biodata by specific user
@@ -205,6 +236,33 @@ async function run() {
       res.send(result);
     });
 
+    //get all user
+    app.get("/all-user/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: { $ne: email } };
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    //manage status
+    app.patch("/oneUser/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user?.status === "Requested")
+        return res
+          .status(400)
+          .send("You have already requested, wait for some time.");
+
+      const updateDoc = {
+        $set: {
+          status: "Requested",
+        },
+      };
+      const result = await usersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
     //delete favourite biodata
     app.delete("/favOneBiodata/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
@@ -235,11 +293,28 @@ async function run() {
         biodataType: "Female",
       });
 
+      const paymentDetails = await paymentCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: "$price" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+            },
+          },
+        ])
+        .next();
+
       res.send({
         totalBioData,
         totalPremium,
         totalMaleBio,
         totalFemaleBio,
+        ...paymentDetails,
       });
     });
 
