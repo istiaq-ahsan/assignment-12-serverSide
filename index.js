@@ -263,6 +263,30 @@ async function run() {
       res.send(result);
     });
 
+    //update role
+    app.patch("/user/role/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const { role } = req.body;
+      const filter = { email };
+      const updateDoc = {
+        $set: { role },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    //update status
+    app.patch("/user/status/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const { status } = req.body;
+      const filter = { email };
+      const updateDoc = {
+        $set: { status },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
     //delete favourite biodata
     app.delete("/favOneBiodata/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
