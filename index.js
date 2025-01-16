@@ -165,18 +165,17 @@ async function run() {
       const paymentStatus = await paymentCollection
         .aggregate([
           {
-            $match: { email }, //Match specific customers data only by email
+            $match: { email },
           },
           {
             $lookup: {
-              // go to a different collection and look for data
-              from: "users", // collection name
-              localField: "email", // local data that you want to match
-              foreignField: "email", // foreign field name of that same data
-              as: "userDetails", // return the data as plants array (array naming)
+              from: "users",
+              localField: "email",
+              foreignField: "email",
+              as: "userDetails",
             },
           },
-          { $unwind: "$userDetails" }, // unwind lookup result, return without array
+          { $unwind: "$userDetails" },
           {
             $addFields: {
               userStatus: "$userDetails.status",
@@ -184,7 +183,6 @@ async function run() {
             },
           },
           {
-            // remove plants object property from order object
             $project: {
               userDetails: 0,
             },
@@ -340,6 +338,35 @@ async function run() {
         totalFemaleBio,
         ...paymentDetails,
       });
+    });
+
+    //only requested user
+    app.get("/req-user", verifyToken, async (req, res) => {
+      const query = { status: "Requested" };
+      const result = await usersCollection
+        .aggregate([
+          {
+            $match: query,
+          },
+          {
+            $lookup: {
+              from: "allBioData",
+              localField: "name",
+              foreignField: "name",
+              as: "biodataInfo",
+            },
+          },
+          {
+            $addFields: {
+              biodataId: { $arrayElemAt: ["$biodataInfo.bioDataId", 0] },
+            },
+          },
+          {
+            $project: { biodataInfo: 0 },
+          },
+        ])
+        .toArray();
+      res.send(result);
     });
 
     // Generate jwt token
