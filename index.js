@@ -82,7 +82,7 @@ async function run() {
       res.send(result);
     });
 
-    //post biodata
+    //post and update biodata
     app.patch("/all-bioData/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const decodedEmail = req.user.email;
@@ -228,6 +228,43 @@ async function run() {
       const biodatas = await biosCollection.find(filters).toArray();
 
       res.send(biodatas);
+    });
+
+    //get premium biodata for homepage
+    app.get("/premium-biodata", async (req, res) => {
+      const query = { status: "Premium" };
+      const result = await usersCollection
+        .aggregate([
+          {
+            $match: query,
+          },
+          {
+            $lookup: {
+              from: "allBioData",
+              localField: "name",
+              foreignField: "name",
+              as: "premiumBiodata",
+            },
+          },
+          {
+            $addFields: {
+              biodataId: { $arrayElemAt: ["$premiumBiodata.bioDataId", 0] },
+              biodataImage: { $arrayElemAt: ["$premiumBiodata.photoURL", 0] },
+              biodataType: { $arrayElemAt: ["$premiumBiodata.biodataType", 0] },
+              division: {
+                $arrayElemAt: ["$premiumBiodata.permanentDivision", 0],
+              },
+              occupation: { $arrayElemAt: ["$premiumBiodata.occupation", 0] },
+              biodataAge: { $arrayElemAt: ["$premiumBiodata.age", 0] },
+              _idOfBiodata: { $arrayElemAt: ["$premiumBiodata._id", 0] },
+            },
+          },
+          {
+            $project: { premiumBiodata: 0 },
+          },
+        ])
+        .toArray();
+      res.send(result);
     });
 
     //get specific bioData by id
