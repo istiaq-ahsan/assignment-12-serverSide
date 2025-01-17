@@ -214,8 +214,20 @@ async function run() {
 
     //get all biodata
     app.get("/all-biodata", async (req, res) => {
-      const result = await biosCollection.find().toArray();
-      res.send(result);
+      const { biodataType, division, occupation, miniAge, maxAge } = req.query;
+
+      const filters = {};
+
+      // Add filters if they exist
+      if (biodataType) filters.biodataType = biodataType;
+      if (division) filters.division = division;
+      if (occupation) filters.occupation = occupation;
+      if (miniAge) filters.age = { ...filters.age, $gte: parseInt(miniAge) };
+      if (maxAge) filters.age = { ...filters.age, $lte: parseInt(maxAge) };
+
+      const biodatas = await biosCollection.find(filters).toArray();
+
+      res.send(biodatas);
     });
 
     //get specific bioData by id
