@@ -30,20 +30,8 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).send({ message: "unauthorized access" });
     }
     req.user = decoded;
+    next();
   });
-  next();
-};
-
-// verify admin after verifyToken
-const verifyAdmin = async (req, res, next) => {
-  const email = req.decoded.email;
-  const query = { email: email };
-  const user = await usersCollection.findOne(query);
-  const isAdmin = user?.role === "admin";
-  if (!isAdmin) {
-    return res.status(403).send({ message: "forbidden access" });
-  }
-  next();
 };
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1pvay.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -64,6 +52,18 @@ async function run() {
     const biosCollection = db.collection("allBioData");
     const favouriteCollection = db.collection("allFavData");
     const paymentCollection = db.collection("payments");
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.user?.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user?.role !== "admin")
+        return res
+          .status(403)
+          .send({ message: "Forbidden Access! Admin Only Actions!" });
+
+      next();
+    };
 
     app.post("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -235,7 +235,7 @@ async function run() {
     });
 
     //get all user
-    app.get("/all-user/:email", verifyToken, async (req, res) => {
+    app.get("/all-user/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const query = { email: { $ne: email } };
       const result = await usersCollection.find(query).toArray();
@@ -243,7 +243,7 @@ async function run() {
     });
 
     //manage status
-    app.patch("/oneUser/:email", verifyToken, async (req, res) => {
+    app.patch("/oneUser/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const query = { email };
       const user = await usersCollection.findOne(query);
@@ -262,28 +262,38 @@ async function run() {
     });
 
     //update role
-    app.patch("/user/role/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const { role } = req.body;
-      const filter = { email };
-      const updateDoc = {
-        $set: { role },
-      };
-      const result = await usersCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/user/role/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const { role } = req.body;
+        const filter = { email };
+        const updateDoc = {
+          $set: { role },
+        };
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
 
     //update status
-    app.patch("/user/status/:email", verifyToken, async (req, res) => {
-      const email = req.params.email;
-      const { status } = req.body;
-      const filter = { email };
-      const updateDoc = {
-        $set: { status },
-      };
-      const result = await usersCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/user/status/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const { status } = req.body;
+        const filter = { email };
+        const updateDoc = {
+          $set: { status },
+        };
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
 
     //delete favourite biodata
     app.delete("/favOneBiodata/:id", verifyToken, async (req, res) => {
@@ -302,7 +312,7 @@ async function run() {
     });
 
     //admin stat dashboard
-    app.get("/admin-stat", verifyToken, async (req, res) => {
+    app.get("/admin-stat", verifyToken, verifyAdmin, async (req, res) => {
       const totalBioData = await biosCollection.estimatedDocumentCount();
 
       const totalPremium = await usersCollection.countDocuments({
@@ -341,7 +351,7 @@ async function run() {
     });
 
     //only requested user
-    app.get("/req-user", verifyToken, async (req, res) => {
+    app.get("/req-user", verifyToken, verifyAdmin, async (req, res) => {
       const query = { status: "Requested" };
       const result = await usersCollection
         .aggregate([
@@ -367,6 +377,21 @@ async function run() {
         ])
         .toArray();
       res.send(result);
+    });
+
+    //get the admin if exist
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.user.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === "admin";
+      }
+      res.send({ admin });
     });
 
     // Generate jwt token
