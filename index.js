@@ -76,7 +76,7 @@ async function run() {
       const result = await usersCollection.insertOne({
         ...user,
         role: "customer",
-        member: "normal",
+        status: "Normal",
         timestamp: Date.now(),
       });
       res.send(result);
@@ -156,7 +156,7 @@ async function run() {
     //get payment status
     app.get("/contact-req/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      const decodedEmail = req.user.email;
+      const decodedEmail = req.user?.email;
       if (decodedEmail !== email)
         return res.status(401).send({ message: "Unauthorized Access" });
       const query = { email };
@@ -241,8 +241,8 @@ async function run() {
           {
             $lookup: {
               from: "allBioData",
-              localField: "name",
-              foreignField: "name",
+              localField: "email",
+              foreignField: "email",
               as: "premiumBiodata",
             },
           },
@@ -263,6 +263,7 @@ async function run() {
             $project: { premiumBiodata: 0 },
           },
         ])
+        .limit(6)
         .toArray();
       res.send(result);
     });
@@ -291,8 +292,8 @@ async function run() {
       res.send(result);
     });
 
-    //manage status
-    app.patch("/oneUser/:email", verifyToken, verifyAdmin, async (req, res) => {
+    //payment status requested from client
+    app.patch("/oneUser/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const query = { email };
       const user = await usersCollection.findOne(query);
@@ -365,7 +366,7 @@ async function run() {
       const totalBioData = await biosCollection.estimatedDocumentCount();
 
       const totalPremium = await usersCollection.countDocuments({
-        member: "premium",
+        status: "Premium",
       });
       const totalMaleBio = await biosCollection.countDocuments({
         biodataType: "Male",
@@ -410,8 +411,8 @@ async function run() {
           {
             $lookup: {
               from: "allBioData",
-              localField: "name",
-              foreignField: "name",
+              localField: "email",
+              foreignField: "email",
               as: "biodataInfo",
             },
           },
