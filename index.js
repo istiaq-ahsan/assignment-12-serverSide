@@ -52,6 +52,7 @@ async function run() {
     const biosCollection = db.collection("allBioData");
     const favouriteCollection = db.collection("allFavData");
     const paymentCollection = db.collection("payments");
+    const reviewCollection = db.collection("clientReview");
 
     const verifyAdmin = async (req, res, next) => {
       const email = req.user?.email;
@@ -442,6 +443,34 @@ async function run() {
         admin = user?.role === "admin";
       }
       res.send({ admin });
+    });
+
+    //public stat
+    app.get("/public-stat", async (req, res) => {
+      const totalBioData = await biosCollection.estimatedDocumentCount();
+
+      const totalMaleBio = await biosCollection.countDocuments({
+        biodataType: "Male",
+      });
+      const totalFemaleBio = await biosCollection.countDocuments({
+        biodataType: "Female",
+      });
+      res.send({
+        totalBioData,
+        totalMaleBio,
+        totalFemaleBio,
+      });
+    });
+
+    //get review
+    app.get("/client-review", async (req, res) => {
+      const sort = req.query.sort;
+
+      let options = {};
+      if (sort) options = { sort: { marriageDate: sort === "asc" ? 1 : -1 } };
+
+      const result = await reviewCollection.find().sort(options.sort).toArray();
+      res.send(result);
     });
 
     // Generate jwt token
