@@ -215,18 +215,29 @@ async function run() {
 
     //get all biodata
     app.get("/all-biodata", async (req, res) => {
-      const { biodataType, division, occupation, miniAge, maxAge } = req.query;
+      const { biodataType, division, occupation, miniAge, maxAge, search } =
+        req.query;
 
       const filters = {};
 
       // Add filters if they exist
       if (biodataType) filters.biodataType = biodataType;
-      if (division) filters.division = division;
+      if (division) filters.permanentDivision = division;
       if (occupation) filters.occupation = occupation;
       if (miniAge) filters.age = { ...filters.age, $gte: parseInt(miniAge) };
       if (maxAge) filters.age = { ...filters.age, $lte: parseInt(maxAge) };
 
-      const biodatas = await biosCollection.find(filters).toArray();
+      const query = {
+        ...filters,
+        ...(search && {
+          name: {
+            $regex: search,
+            $options: "i",
+          },
+        }),
+      };
+
+      const biodatas = await biosCollection.find(query).toArray();
 
       res.send(biodatas);
     });
