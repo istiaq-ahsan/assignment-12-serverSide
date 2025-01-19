@@ -455,10 +455,14 @@ async function run() {
       const totalFemaleBio = await biosCollection.countDocuments({
         biodataType: "Female",
       });
+
+      const couplePaired = await reviewCollection.estimatedDocumentCount();
+
       res.send({
         totalBioData,
         totalMaleBio,
         totalFemaleBio,
+        couplePaired,
       });
     });
 
@@ -470,6 +474,16 @@ async function run() {
       if (sort) options = { sort: { marriageDate: sort === "asc" ? 1 : -1 } };
 
       const result = await reviewCollection.find().sort(options.sort).toArray();
+      res.send(result);
+    });
+
+    //post review
+    app.post("/success-story", verifyToken, async (req, res) => {
+      const story = req.body;
+      if (story.marriageDate) {
+        story.marriageDate = new Date(story.marriageDate);
+      }
+      const result = await reviewCollection.insertOne(story);
       res.send(result);
     });
 
