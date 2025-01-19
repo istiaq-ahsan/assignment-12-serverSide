@@ -466,7 +466,7 @@ async function run() {
       });
     });
 
-    //get review
+    //get review for homepage
     app.get("/client-review", async (req, res) => {
       const sort = req.query.sort;
 
@@ -484,6 +484,12 @@ async function run() {
         story.marriageDate = new Date(story.marriageDate);
       }
       const result = await reviewCollection.insertOne(story);
+      res.send(result);
+    });
+
+    //get review for admin
+    app.get("/reviewFor-admin", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await reviewCollection.find().toArray();
       res.send(result);
     });
 
