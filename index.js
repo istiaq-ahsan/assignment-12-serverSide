@@ -244,7 +244,11 @@ async function run() {
 
     //get premium biodata for homepage
     app.get("/premium-biodata", async (req, res) => {
+      const { sort } = req.query;
+
       const query = { status: "Premium" };
+      const sortOrder = sort === "asc" ? 1 : sort === "dsc" ? -1 : null;
+
       const result = await usersCollection
         .aggregate([
           {
@@ -274,6 +278,13 @@ async function run() {
           {
             $project: { premiumBiodata: 0 },
           },
+          ...(sortOrder !== null
+            ? [
+                {
+                  $sort: { biodataAge: sortOrder }, // Apply sorting based on the sortOrder
+                },
+              ]
+            : []),
         ])
         .limit(6)
         .toArray();
@@ -475,6 +486,14 @@ async function run() {
         totalFemaleBio,
         couplePaired,
       });
+    });
+
+    //profile
+    app.get("/profile/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const result = await usersCollection.findOne(query);
+      res.send(result);
     });
 
     //get review for homepage
