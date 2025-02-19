@@ -57,6 +57,7 @@ async function run() {
     const favouriteCollection = db.collection("allFavData");
     const paymentCollection = db.collection("payments");
     const reviewCollection = db.collection("clientReview");
+    const defaultAdminInfo = db.collection("defaultAdmin");
 
     const verifyAdmin = async (req, res, next) => {
       const email = req.user?.email;
